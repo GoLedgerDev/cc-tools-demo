@@ -8,4 +8,7 @@ import (
 
 var txList = []tx.Transaction{
 	txdefs.GetHeader,
+	txdefs.CreateNewLibrary,
+	txdefs.UpdateBookTenant,
+	txdefs.GetNumberOfBooksFromLibrary,
 }

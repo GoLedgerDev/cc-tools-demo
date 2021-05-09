@@ -38,3 +38,6 @@ printf "%s\n" "$HEADERFILE" > chaincode/header/header.go
 
 # Clear trap
 trap - 2
+
+# Upload to S3 bucket
+aws s3 cp cc-tools-demo.tar.gz s3://gofabric-templates/trial/
