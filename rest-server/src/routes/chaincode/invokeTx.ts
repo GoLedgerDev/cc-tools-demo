@@ -27,9 +27,9 @@ const invokeTx = (req: Request, res: Response, next: NextFunction) => {
     }
   } else if (req.query['collections']) {
     if (Array.isArray(req.query['collections'])) {
-      collectionsNames = req.query['collections']
+      collectionsNames = req.query['collections'] as string[]
     } else {
-      collectionsNames = [req.query['collections']]
+      collectionsNames = [req.query['collections']] as string[]
     }
   }
 
