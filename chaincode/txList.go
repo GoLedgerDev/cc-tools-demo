@@ -13,4 +13,5 @@ var txList = []tx.Transaction{
 	txdefs.CreateNewLibrary,
 	txdefs.GetNumberOfBooksFromLibrary,
 	txdefs.UpdateBookTenant,
+	txdefs.SearchPersonName,
 }

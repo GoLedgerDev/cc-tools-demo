@@ -10,4 +10,5 @@ var assetTypeList = []assets.AssetType{
 	assettypes.Book,
 	assettypes.Library,
 	assettypes.Secret,
+	assettypes.Car,
 }
