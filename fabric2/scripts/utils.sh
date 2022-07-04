@@ -71,6 +71,20 @@ function printHelp() {
     println " Examples:"
     println "   network.sh deployCC -ccn basic -ccp ../asset-transfer-basic/chaincode-javascript/ ./ -ccl javascript"
     println "   network.sh deployCC -ccn mychaincode -ccp ./user/mychaincode -ccv 1 -ccl javascript"
+  elif [ "$USAGE" == "down" ]; then
+    println "Usage: "
+    println "  network.sh \033[0;32mdown\033[0m [Flags]"
+    println
+    println "    Flags:"
+    println "    -noclr - Disable clearing containers while bringing down a network"
+    println
+    println "    -h - Print this message"
+    println
+    println " Possible Mode and flag combinations"
+    println "   \033[0;32mdown\033[0m -noclr"
+    println
+    println " Examples:"
+    println "   network.sh down -noclr"
   else
     println "Usage: "
     println "  network.sh <Mode> [Flags]"
@@ -103,6 +117,9 @@ function printHelp() {
     println "    -cccg <collection-config>  - (Optional) File path to private data collections configuration file"
     println "    -cci <fcn name>  - (Optional) Name of chaincode initialization function. When a function is provided, the execution of init will be requested and the function will be invoked."
     println
+    println "    Used with \033[0;32mnetwork.sh down\033[0m"
+    println "    -noclr - Disable clearing containers while bringing down a network"
+    println
     println "    -h - Print this message"
     println
     println " Possible Mode and flag combinations"
@@ -110,12 +127,14 @@ function printHelp() {
     println "   \033[0;32mup createChannel\033[0m -ca -c -r -d -s -i -cai -verbose"
     println "   \033[0;32mcreateChannel\033[0m -c -r -d -verbose"
     println "   \033[0;32mdeployCC\033[0m -ccn -ccl -ccv -ccs -ccp -cci -r -d -verbose"
+    println "   \033[0;32mdown\033[0m -noclr"
     println
     println " Examples:"
     println "   network.sh up createChannel -ca -c mychannel -s couchdb -i 2.0.0"
     println "   network.sh createChannel -c channelName"
     println "   network.sh deployCC -ccn basic -ccp ../asset-transfer-basic/chaincode-javascript/ -ccl javascript"
     println "   network.sh deployCC -ccn mychaincode -ccp ./user/mychaincode -ccv 1 -ccl javascript"
+    println "   network.sh down -noclr"
   fi
 }
 

@@ -35,7 +35,6 @@ then
   # Generate self-signed cert
 fi
 
-
 if [ $ORG_QTY -gt 1 ]
 then
   sed "s/PORT/${SED_PORT}/g" template/docker-compose-org1-template.yaml > docker-compose-org1.yaml

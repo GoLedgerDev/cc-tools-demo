@@ -24,7 +24,6 @@ export SYS_CHANNEL=sys-channel
 . scripts/utils.sh
 
 # Obtain CONTAINER_IDS and remove them
-# TODO Might want to make this optional - could clear other containers
 # This function is called when you bring a network down
 function clearContainers() {
   CONTAINER_IDS=$(docker ps -a | awk '($2 ~ /dev-peer.*/) {print $1}')
@@ -148,50 +147,73 @@ function createOrgs() {
     fi
     infoln "Generating certificates using cryptogen tool"
 
-    infoln "Creating Org1 Identities"
+    if [ $ORG_QNTY -gt 1 ] ; then
+      infoln "Creating Org1 Identities"
 
+      set -x
+      cryptogen generate --config=./organizations/cryptogen/crypto-config-org1.yaml --output="organizations"
+      res=$?
+      { set +x; } 2>/dev/null
+      if [ $res -ne 0 ]; then
+        fatalln "Failed to generate certificates..."
+      fi
 
-    set -x
-    cryptogen generate --config=./organizations/cryptogen/crypto-config-org1.yaml --output="organizations"
-    res=$?
-    { set +x; } 2>/dev/null
-    if [ $res -ne 0 ]; then
-      fatalln "Failed to generate certificates..."
+      infoln "Creating Org2 Identities"
+
+      set -x
+      cryptogen generate --config=./organizations/cryptogen/crypto-config-org2.yaml --output="organizations"
+      res=$?
+      { set +x; } 2>/dev/null
+      if [ $res -ne 0 ]; then
+        fatalln "Failed to generate certificates..."
+      fi
+
+      infoln "Creating Org3 Identities"
+
+      set -x
+      cryptogen generate --config=./organizations/cryptogen/crypto-config-org3.yaml --output="organizations"
+      res=$?
+      { set +x; } 2>/dev/null
+      if [ $res -ne 0 ]; then
+        fatalln "Failed to generate certificates..."
+      fi
+
+      infoln "Creating Orderer Org Identities"
+
+      set -x
+      cryptogen generate --config=./organizations/cryptogen/crypto-config-orderer.yaml --output="organizations"
+      res=$?
+      { set +x; } 2>/dev/null
+      if [ $res -ne 0 ]; then
+        fatalln "Failed to generate certificates..."
+      fi
+
+      copyRestCerts org1.example.com
+      copyRestCerts org2.example.com
+      copyRestCerts org3.example.com
+    else
+      infoln "Creating Org Identities"
+
+      set -x
+      cryptogen generate --config=./organizations/cryptogen/crypto-config-org.yaml --output="organizations"
+      res=$?
+      { set +x; } 2>/dev/null
+      if [ $res -ne 0 ]; then
+        fatalln "Failed to generate certificates..."
+      fi
+
+      infoln "Creating Orderer Org Identities"
+
+      set -x
+      cryptogen generate --config=./organizations/cryptogen/crypto-config-orderer.yaml --output="organizations"
+      res=$?
+      { set +x; } 2>/dev/null
+      if [ $res -ne 0 ]; then
+        fatalln "Failed to generate certificates..."
+      fi
+
+      copyRestCerts org.example.com
     fi
-
-    infoln "Creating Org2 Identities"
-
-    set -x
-    cryptogen generate --config=./organizations/cryptogen/crypto-config-org2.yaml --output="organizations"
-    res=$?
-    { set +x; } 2>/dev/null
-    if [ $res -ne 0 ]; then
-      fatalln "Failed to generate certificates..."
-    fi
-
-    infoln "Creating Org3 Identities"
-
-    set -x
-    cryptogen generate --config=./organizations/cryptogen/crypto-config-org3.yaml --output="organizations"
-    res=$?
-    { set +x; } 2>/dev/null
-    if [ $res -ne 0 ]; then
-      fatalln "Failed to generate certificates..."
-    fi
-
-    infoln "Creating Orderer Org Identities"
-
-    set -x
-    cryptogen generate --config=./organizations/cryptogen/crypto-config-orderer.yaml --output="organizations"
-    res=$?
-    { set +x; } 2>/dev/null
-    if [ $res -ne 0 ]; then
-      fatalln "Failed to generate certificates..."
-    fi
-
-    copyRestCerts org1.example.com
-    copyRestCerts org2.example.com
-    copyRestCerts org3.example.com
 
   fi
 
@@ -199,35 +221,64 @@ function createOrgs() {
   if [ "$CRYPTO" == "Certificate Authorities" ]; then
     infoln "Generating certificates using Fabric CA"
 
-    IMAGE_TAG=${CA_IMAGETAG} docker-compose -f $COMPOSE_FILE_CA up -d 2>&1
+    if [ $ORG_QNTY == 1 ]; then
+        local orgs=(org)
+    else
+        local orgs=(org1 org2 org3)
+    fi
 
+    for ORG in ${orgs[@]}; do
+      IMAGE_TAG=${CA_IMAGETAG} docker-compose -f $COMPOSE_FILE_CA up -d 2>&1 ca_$ORG
+    done
     . organizations/fabric-ca/registerEnroll.sh
 
-  while :
-    do
-      if [ ! -f "organizations/fabric-ca/org1/tls-cert.pem" ]; then
-        sleep 1
-      else
-        break
-      fi
-    done
+  if [ $ORG_QNTY -gt 1 ] ; then
+    while :
+      do
+        if [ ! -f "organizations/fabric-ca/org1/tls-cert.pem" ]; then
+          sleep 1
+        else
+          break
+        fi
+      done
 
-    infoln "Creating Org1 Identities"
+      infoln "Creating Org1 Identities"
 
-    createOrg1
+      createOrg1
 
-    infoln "Creating Org2 Identities"
+      infoln "Creating Org2 Identities"
 
-    createOrg2
+      createOrg2
 
-    infoln "Creating Orderer Org Identities"
+      infoln "Creating Orderer Org Identities"
 
-    createOrderer
+      createOrderer
 
+    infoln "Generating CCP files for Org1 and Org2"
+    ./organizations/ccp-generate.sh
+  else
+    while :
+      do
+        if [ ! -f "organizations/fabric-ca/org/tls-cert.pem" ]; then
+          sleep 1
+        else
+          break
+        fi
+      done
+
+      infoln "Creating Org Identities"
+
+      createOrg
+
+      infoln "Creating Orderer Org Identities"
+
+      createOrderer
+
+    fi
+
+    infoln "Generating CCP files for Org"
+    ./organizations/ccp-generate.sh -n 1
   fi
-
-  infoln "Generating CCP files for Org1 and Org2"
-  ./organizations/ccp-generate.sh
 }
 
 function copyRestCerts() {
@@ -288,7 +339,11 @@ function createConsortium() {
   # Note: For some unknown reason (at least for now) the block file can't be
   # named orderer.genesis.block or the orderer will fail to launch!
   set -x
-  configtxgen -profile TwoOrgsOrdererGenesis -channelID system-channel -outputBlock ./system-genesis-block/genesis.block
+  if [ $ORG_QNTY -gt 1 ] ; then
+    configtxgen -configPath "./configtx" -profile TwoOrgsOrdererGenesis -channelID system-channel -outputBlock ./system-genesis-block/genesis.block
+  else
+    configtxgen -configPath "./configtx-1org" -profile OneOrgOrdererGenesis -channelID system-channel -outputBlock ./system-genesis-block/genesis.block
+  fi
   res=$?
   { set +x; } 2>/dev/null
   if [ $res -ne 0 ]; then
@@ -311,10 +366,16 @@ function networkUp() {
     createConsortium
   fi
 
-  COMPOSE_FILES="-f ${COMPOSE_FILE_BASE}"
+  if [ $ORG_QNTY == 1 ]; then
+    COMPOSE_FILES="-f ${COMPOSE_FILE_BASE_ORG}"
+    COUCHDB_COMPOSE=$COMPOSE_FILE_COUCH_ORG
+  else
+    COMPOSE_FILES="-f ${COMPOSE_FILE_BASE}"
+    COUCHDB_COMPOSE=$COMPOSE_FILE_COUCH
+  fi
 
   if [ "${DATABASE}" == "couchdb" ]; then
-    COMPOSE_FILES="${COMPOSE_FILES} -f ${COMPOSE_FILE_COUCH}"
+    COMPOSE_FILES="${COMPOSE_FILES} -f ${COUCHDB_COMPOSE}"
   fi
 
   IMAGE_TAG=$IMAGETAG docker-compose ${COMPOSE_FILES} up -d 2>&1
@@ -339,13 +400,13 @@ function createChannel() {
   # more to create the channel creation transaction and the anchor peer updates.
   # configtx.yaml is mounted in the cli container, which allows us to use it to
   # create the channel artifacts
-  scripts/createChannel.sh $CHANNEL_NAME $CLI_DELAY $MAX_RETRY $VERBOSE
+  scripts/createChannel.sh $CHANNEL_NAME $CLI_DELAY $MAX_RETRY $VERBOSE $ORG_QNTY
 }
 
 
 ## Call the script to deploy a chaincode to the channel
 function deployCC() {
-  scripts/deployCC.sh $CHANNEL_NAME $CC_NAME $CC_SRC_PATH $CC_SRC_LANGUAGE $CC_VERSION $CC_SEQUENCE $CC_INIT_FCN $CC_END_POLICY $CC_COLL_CONFIG $CLI_DELAY $MAX_RETRY $VERBOSE
+  scripts/deployCC.sh $CHANNEL_NAME $CC_NAME $CC_SRC_PATH $CC_SRC_LANGUAGE $CC_VERSION $CC_SEQUENCE $CC_INIT_FCN $CC_END_POLICY $CC_COLL_CONFIG $CLI_DELAY $MAX_RETRY $VERBOSE $ORG_QNTY
 
   if [ $? -ne 0 ]; then
     fatalln "Deploying chaincode failed"
@@ -356,13 +417,16 @@ function deployCC() {
 # Tear down running network
 function networkDown() {
   # stop org3 containers also in addition to org1 and org2, in case we were running sample to add org3
+  docker-compose -f $COMPOSE_FILE_BASE_ORG -f $COMPOSE_FILE_COUCH_ORG down --volumes --remove-orphans
   docker-compose -f $COMPOSE_FILE_BASE -f $COMPOSE_FILE_COUCH -f $COMPOSE_FILE_CA down --volumes --remove-orphans
   docker-compose -f $COMPOSE_FILE_COUCH_ORG3 -f $COMPOSE_FILE_ORG3 down --volumes --remove-orphans
   # Don't remove the generated artifacts -- note, the ledgers are always removed
   if [ "$MODE" != "restart" ]; then
     # Bring down the network, deleting the volumes
     #Cleanup the chaincode containers
-    clearContainers
+    if [ "$CLR_CONTAINERS" = true ]; then
+      clearContainers
+    fi
     #Cleanup images
     removeUnwantedImages
     # remove orderer block and other channel configuration transactions and certs
@@ -401,8 +465,12 @@ CC_COLL_CONFIG="../chaincode/collections2.json"
 CC_INIT_FCN="NA"
 # use this as the default docker-compose yaml definition
 COMPOSE_FILE_BASE=docker/docker-compose-test-net.yaml
+# use this as the default docker-compose yaml definition for 1 org
+COMPOSE_FILE_BASE_ORG=docker/docker-compose-test-net-org.yaml
 # docker-compose.yaml file if you are using couchdb
 COMPOSE_FILE_COUCH=docker/docker-compose-couch.yaml
+# docker-compose.yaml file if you are using couchdb for 1 org
+COMPOSE_FILE_COUCH_ORG=docker/docker-compose-couch-org.yaml
 # certificate authorities compose file
 COMPOSE_FILE_CA=docker/docker-compose-ca.yaml
 # use this as the docker compose couch file for org3
@@ -422,6 +490,10 @@ IMAGETAG="2.2.3"
 CA_IMAGETAG="latest"
 # default database
 DATABASE="couchdb"
+# default number of organizartions
+ORG_QNTY=3
+# Clear containers (down mode) -- default = true
+CLR_CONTAINERS=true
 
 # Parse commandline args
 
@@ -515,6 +587,14 @@ while [[ $# -ge 1 ]] ; do
     VERBOSE=true
     shift
     ;;
+  -n )
+    ORG_QNTY=$2
+    shift
+    ;;
+  -noclr )
+    CLR_CONTAINERS=false
+    shift
+    ;;
   * )
     errorln "Unknown flag: $key"
     printHelp
@@ -545,6 +625,13 @@ elif [ "$MODE" == "deployCC" ]; then
   infoln "deploying chaincode on channel '${CHANNEL_NAME}'"
 else
   printHelp
+  exit 1
+fi
+
+# Verify if organization number is within range
+if [ $ORG_QNTY != 3 -a $ORG_QNTY != 1 ]
+then
+  echo 'WARNING: The number of organizations allowed is either 3 or 1.'
   exit 1
 fi
 
